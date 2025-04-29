@@ -1,19 +1,3 @@
-Pre-Install on Orange Pi 5
-
-1. Install rust
-`curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`
-
-2. Install pkg-config, libssl
-```bash
-sudo apt-get update
-sudo apt-get install pkg-config libssl-dev
-```
-
-3. Install clang
-`sudo apt-get install  libclang-dev`
-
-4. Then run as instruction bellow
-
 # llmserver-rs [![dependency status](https://deps.rs/repo/github/darkautism/llmserver-rs/status.svg)](https://deps.rs/repo/github/darkautism/llmserver-rs)
 
 A Rust-based, OpenAI-style API server for large language models (LLMs) that can run on the Rknpu
