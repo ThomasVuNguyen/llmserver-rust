@@ -31,11 +31,11 @@ sudo curl -L https://github.com/airockchip/rknn-toolkit2/raw/refs/heads/master/r
 
 **Clone the Repository**:
 ```bash
-git clone https://github.com/darkautism/llmserver-rs
+git clone https://github.com/thanhtantran/llmserver-rust
 ```
 **Build the Project:**
 ```bash
-cd llmserver-rs
+cd llmserver-rust
 cargo build --release
 ```
 **Run the Server:**
