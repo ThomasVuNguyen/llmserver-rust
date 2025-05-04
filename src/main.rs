@@ -1,12 +1,12 @@
 use actix::{Actor, Recipient};
 use clap::{Arg, ArgAction, Command};
 use serde::Deserialize;
-use std::{collections::HashMap, fs::File, io::BufReader, net::Ipv4Addr};
+use std::{collections::HashMap, fs::File, io::BufReader, net::Ipv4Addr, path::Path};
 
 use actix_web::{head, middleware::Logger, App, HttpServer, Result};
 use llmserver_rs::{
-    asr::simple::SimpleASRConfig, llm::simple::SimpleLLMConfig, AIModel, ProcessAudio,
-    ProcessMessages, ShutdownMessages,
+    asr::simple::SimpleASRConfig, huggingface::{check_model_exists, create_config_file, determine_model_type, ModelType},
+    llm::simple::SimpleLLMConfig, AIModel, ProcessAudio, ProcessMessages, ShutdownMessages,
 };
 use utoipa_actix_web::{scope, AppExt};
 use utoipa_swagger_ui::SwaggerUi;
@@ -29,92 +29,109 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::init();
 
     let matches = Command::new("rkllm")
-        .about("Stupid webserver ever!")
+        .about("Hugging Face model server")
         .version(VERSION)
         .arg_required_else_help(true)
         .arg(Arg::new("model_name"))
         .arg(
             Arg::new("instances")
                 .short('i')
-                .help("How many llm instances do you want to create.")
+                .help("How many model instances do you want to create.")
                 .action(ArgAction::Set)
                 .num_args(1),
         )
         .get_matches();
 
-    //初始化模型
-    let mut num_instances = 1; // 根據資源設定
+    // Initialize model
+    let mut num_instances = 1;
 
     if let Some(value) = matches.get_one::<usize>("instances") {
         num_instances = *value;
     }
-    let model_name = matches.get_one::<String>("model_name").unwrap();
+    let model_id = matches.get_one::<String>("model_name").unwrap();
+
+    // Check if model exists on Hugging Face
+    if !check_model_exists(model_id) {
+        panic!("Model {} does not exist or is not accessible on Hugging Face", model_id);
+    }
+
+    // Determine model type
+    let model_type = determine_model_type(model_id)
+        .unwrap_or_else(|| panic!("Could not determine model type for {}", model_id));
+
+    // Create config file if it doesn't exist
+    let parts: Vec<&str> = model_id.split('/').collect();
+    let model_name = if parts.len() == 2 { parts[1] } else { model_id };
+    
+    let config_file_name = format!("assets/config/{}.json", model_name.to_lowercase().replace('-', "_"));
+    if !Path::new(&config_file_name).exists() {
+        println!("Creating config file for model: {}", model_id);
+        let config_path = create_config_file(model_id, model_type)?;
+        println!("Created config file: {}", config_path);
+    }
 
     // Text type LLM
     let mut llm_recipients = HashMap::<String, Vec<Recipient<ProcessMessages>>>::new();
-    let mut shutdown_recipients = Vec::new();
-    for _ in 0..num_instances {
-        let (llm, modelname) = match (*model_name).as_str() {
-            "kautism/DeepSeek-R1-Distill-Qwen-1.5B-RK3588S-RKLLM1.1.4" => {
-                let config_path = "assets/config/deepseek-1.5b.json";
-                let file =
-                    File::open(config_path).expect(&format!("Config {} not found!", config_path));
-                let mut de = serde_json::Deserializer::from_reader(BufReader::new(file));
-                let config = SimpleLLMConfig::deserialize(&mut de)?;
-                (
-                    llmserver_rs::llm::simple::SimpleRkLLM::init(&config),
-                    config.modle_name.clone(),
-                )
-            }
-            "kautism/DeepSeek-R1-Distill-Qwen-7B-RK3588S-RKLLM1.1.4" => {
-                let config_path = "assets/config/deepseek-7b.json";
-                let file =
-                    File::open(config_path).expect(&format!("Config {} not found!", config_path));
-                let mut de = serde_json::Deserializer::from_reader(BufReader::new(file));
-                let config = SimpleLLMConfig::deserialize(&mut de)?;
-                (
-                    llmserver_rs::llm::simple::SimpleRkLLM::init(&config),
-                    config.modle_name.clone(),
-                )
-            }
-            _ => {continue;},
-        };
-        let addr = llm.unwrap().start(); // 啟動 Actor，一次即可
-        if let Some(vec) = llm_recipients.get_mut(&modelname) {
-            vec.push(addr.clone().recipient::<ProcessMessages>());
-        } else {
-            llm_recipients.insert(modelname, vec![addr.clone().recipient::<ProcessMessages>()]);
-        }
-        shutdown_recipients.push(addr.clone().recipient::<ShutdownMessages>());
-    }
-
-    //let mut
     let mut audio_recipients = HashMap::<String, Vec<Recipient<ProcessAudio>>>::new();
-    for _ in 0..num_instances {
-        let (llm, modelname) = match (*model_name).as_str() {
-            "happyme531/SenseVoiceSmall-RKNN2" => {
-                let config_path = "assets/config/sensevoicesmall.json";
-                let file =
-                    File::open(config_path).expect(&format!("Config {} not found!", config_path));
+    let mut shutdown_recipients = Vec::new();
+
+    match model_type {
+        ModelType::LLM => {
+            // Initialize LLM model
+            for _ in 0..num_instances {
+                let file = File::open(&config_file_name)
+                    .expect(&format!("Config {} not found!", config_file_name));
+                let mut de = serde_json::Deserializer::from_reader(BufReader::new(file));
+                let config = SimpleLLMConfig::deserialize(&mut de)?;
+                let model_name = config.modle_name.clone();
+                
+                match llmserver_rs::llm::simple::SimpleRkLLM::init(&config) {
+                    Ok(llm) => {
+                        let addr = llm.start();
+                        if let Some(vec) = llm_recipients.get_mut(&model_name) {
+                            vec.push(addr.clone().recipient::<ProcessMessages>());
+                        } else {
+                            llm_recipients.insert(model_name, vec![addr.clone().recipient::<ProcessMessages>()]);
+                        }
+                        shutdown_recipients.push(addr.clone().recipient::<ShutdownMessages>());
+                    },
+                    Err(e) => {
+                        eprintln!("Failed to initialize LLM model {}: {}", model_id, e);
+                        panic!("Failed to initialize model");
+                    }
+                }
+            }
+        },
+        ModelType::ASR => {
+            // Initialize ASR model
+            for _ in 0..num_instances {
+                let file = File::open(&config_file_name)
+                    .expect(&format!("Config {} not found!", config_file_name));
                 let mut de = serde_json::Deserializer::from_reader(BufReader::new(file));
                 let config = SimpleASRConfig::deserialize(&mut de)?;
-                (
-                    llmserver_rs::asr::simple::SimpleASR::init(&config),
-                    config.modle_name.clone(),
-                )
+                let model_name = config.modle_name.clone();
+                
+                match llmserver_rs::asr::simple::SimpleASR::init(&config) {
+                    Ok(asr) => {
+                        let addr = asr.start();
+                        if let Some(vec) = audio_recipients.get_mut(&model_name) {
+                            vec.push(addr.clone().recipient::<ProcessAudio>());
+                        } else {
+                            audio_recipients.insert(model_name, vec![addr.clone().recipient::<ProcessAudio>()]);
+                        }
+                        shutdown_recipients.push(addr.clone().recipient::<ShutdownMessages>());
+                    },
+                    Err(e) => {
+                        eprintln!("Failed to initialize ASR model {}: {}", model_id, e);
+                        panic!("Failed to initialize model");
+                    }
+                }
             }
-            _ => {continue;},
-        };
-        let addr = llm.unwrap().start(); // 啟動 Actor，一次即可
-        if let Some(vec) = audio_recipients.get_mut(&modelname) {
-            vec.push(addr.clone().recipient::<ProcessAudio>());
-        } else {
-            audio_recipients.insert(modelname, vec![addr.clone().recipient::<ProcessAudio>()]);
         }
-        shutdown_recipients.push(addr.clone().recipient::<ShutdownMessages>());
     }
+
     if audio_recipients.len() == 0 && llm_recipients.len() == 0 {
-        panic!("You do not load any model");
+        panic!("Failed to load any model");
     }
 
     HttpServer::new(move || {

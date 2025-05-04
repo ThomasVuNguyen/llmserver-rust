@@ -1,5 +1,6 @@
 pub mod audio;
 pub mod chat;
+pub mod huggingface;
 pub mod llm;
 pub mod asr;
 
