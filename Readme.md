@@ -1,6 +1,6 @@
-# llmserver-rs [![dependency status](https://deps.rs/repo/github/darkautism/llmserver-rs/status.svg)](https://deps.rs/repo/github/darkautism/llmserver-rs)
+# LLM SERVER RUST
 
-A Rust-based, OpenAI-style API server for large language models (LLMs) that can run on the Rknpu
+A Rust-based, OpenAI-style API server for large language models (LLMs) that can run on the RKNPU
 
 ## Description
 
@@ -40,7 +40,7 @@ cargo build --release
 ```
 **Run the Server:**
 ```bash
-./target/release/llmserver kautism/DeepSeek-R1-Distill-Qwen-1.5B-RK3588S-RKLLM1.1.4
+./target/release/llmserver MODEL
 ```
 
 ## Install on cluster
