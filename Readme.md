@@ -40,8 +40,10 @@ cargo build --release
 ```
 **Run the Server:**
 ```bash
-./target/release/llmserver MODEL
+./target/release/llmserver-rs MODEL
 ```
+
+## Install on docker
 
 ## Install on cluster
 
