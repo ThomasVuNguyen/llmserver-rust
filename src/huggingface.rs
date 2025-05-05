@@ -1,4 +1,4 @@
-use hf_hub::{api::sync::Api, Repo, RepoType};
+use hf_hub::api::sync::Api;
 use serde::{Deserialize, Serialize};
 use std::fs::{self, File};
 use std::io::Write;

@@ -56,8 +56,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // Determine model type
-    let model_type = determine_model_type(model_id)
-        .unwrap_or_else(|| panic!("Could not determine model type for {}", model_id));
+    let model_type = determine_model_type(model_id);
 
     // Create config file if it doesn't exist
     let parts: Vec<&str> = model_id.split('/').collect();
