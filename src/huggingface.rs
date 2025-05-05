@@ -8,44 +8,28 @@ use std::path::Path;
 pub fn check_model_exists(model_id: &str) -> bool {
     let api = Api::new().expect("Failed to create Hugging Face API client");
     
-    // Split model_id into owner and name
-    let parts: Vec<&str> = model_id.split('/').collect();
-    if parts.len() != 2 {
-        return false;
-    }
-    
-    let owner = parts[0];
-    let name = parts[1];
-    
-    // Try to get model info - if it succeeds, the model exists and is accessible
-    api.model(owner, name).info().is_ok()
+    // The model_id should be in the format "owner/name"
+    // We don't need to split it as the API accepts the full model_id
+    api.model(model_id.to_string()).info().is_ok()
 }
 
 /// Determines the model type based on files or metadata
 pub fn determine_model_type(model_id: &str) -> Option<ModelType> {
     let api = Api::new().expect("Failed to create Hugging Face API client");
     
-    let parts: Vec<&str> = model_id.split('/').collect();
-    if parts.len() != 2 {
-        return None;
-    }
-    
-    let owner = parts[0];
-    let name = parts[1];
-    
     // Check for common files that indicate model type
+    // The repo_id should be in the format "owner/name"
     let repo = api.repo(Repo::with_revision(
-        owner.to_string(),
-        name.to_string(),
+        model_id.to_string(),
         RepoType::Model,
         "main".to_string(),
     ));
     
     // This is a simplified approach - in a real implementation, you'd want to check
     // for specific files or metadata that indicate the model type
-    if name.to_lowercase().contains("llm") || name.to_lowercase().contains("gpt") {
+    if model_id.to_lowercase().contains("llm") || model_id.to_lowercase().contains("gpt") {
         Some(ModelType::LLM)
-    } else if name.to_lowercase().contains("voice") || name.to_lowercase().contains("asr") {
+    } else if model_id.to_lowercase().contains("voice") || model_id.to_lowercase().contains("asr") {
         Some(ModelType::ASR)
     } else {
         // Default to LLM if we can't determine
