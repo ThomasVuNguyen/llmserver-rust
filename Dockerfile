@@ -3,7 +3,7 @@ WORKDIR /llmserver-rs
 COPY . /llmserver-rs
 RUN apt update
 RUN apt install clang curl libssl-dev pkg-config cmake libsentencepiece-dev libsentencepiece0 -y
-RUN curl -L https://github.com/airockchip/rknn-llm/raw/refs/heads/main/rkllm-runtime/Linux/librkllm_api/aarch64/librkllmrt.so -o /lib/librkllmrt.so
+RUN curl -L https://github.com/airockchip/rknn-llm/raw/cb5b341364311065fd19eddd631a79a9f0c5afe1/rkllm-runtime/Linux/librkllm_api/aarch64/librkllmrt.so -o /lib/librkllmrt.so
 RUN curl -L https://github.com/airockchip/rknn-toolkit2/raw/refs/heads/master/rknpu2/runtime/Linux/librknn_api/aarch64/librknnrt.so -o /lib/librknnrt.so
 RUN cargo build --release
 
