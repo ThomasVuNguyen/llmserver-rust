@@ -5,6 +5,7 @@ use std::io::Write;
 use std::path::Path;
 
 /// Checks if a model exists and is accessible on Hugging Face
+/// This function should only be called at runtime, not during compilation
 pub fn check_model_exists(model_id: &str) -> bool {
     let api = Api::new().expect("Failed to create Hugging Face API client");
     
@@ -13,27 +14,22 @@ pub fn check_model_exists(model_id: &str) -> bool {
     api.model(model_id.to_string()).info().is_ok()
 }
 
-/// Determines the model type based on files or metadata
-pub fn determine_model_type(model_id: &str) -> Option<ModelType> {
-    let api = Api::new().expect("Failed to create Hugging Face API client");
-    
-    // Check for common files that indicate model type
-    // The repo_id should be in the format "owner/name"
-    let repo = api.repo(Repo::with_revision(
-        model_id.to_string(),
-        RepoType::Model,
-        "main".to_string(),
-    ));
-    
-    // This is a simplified approach - in a real implementation, you'd want to check
-    // for specific files or metadata that indicate the model type
-    if model_id.to_lowercase().contains("llm") || model_id.to_lowercase().contains("gpt") {
-        Some(ModelType::LLM)
-    } else if model_id.to_lowercase().contains("voice") || model_id.to_lowercase().contains("asr") {
-        Some(ModelType::ASR)
+/// Determines the model type based on model_id naming conventions
+/// This is a simplified approach that doesn't require API calls
+pub fn determine_model_type(model_id: &str) -> ModelType {
+    // Simple heuristic based on model name
+    if model_id.to_lowercase().contains("llm") || 
+       model_id.to_lowercase().contains("gpt") ||
+       model_id.to_lowercase().contains("llama") ||
+       model_id.to_lowercase().contains("mistral") {
+        ModelType::LLM
+    } else if model_id.to_lowercase().contains("voice") || 
+              model_id.to_lowercase().contains("asr") ||
+              model_id.to_lowercase().contains("whisper") {
+        ModelType::ASR
     } else {
         // Default to LLM if we can't determine
-        Some(ModelType::LLM)
+        ModelType::LLM
     }
 }
 
