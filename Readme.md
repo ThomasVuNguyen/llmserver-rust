@@ -45,6 +45,8 @@ cargo build --release
 
 ## Install on docker
 
+Download and deploy image [here](https://hub.docker.com/r/thanhtantran/llmserver-rust)
+
 ## Install on cluster
 
 You need to find out which sbc in your cluster is cpu rk3588
