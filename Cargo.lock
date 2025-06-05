@@ -383,9 +383,9 @@ checksum = "ace50bade8e6234aa140d9a2f552bbee1db4d353f69b8217bc503490fc1a9f26"
 
 [[package]]
 name = "autotokenizer"
-version = "0.1.1"
+version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "066bbaa934b72d196cff024e8c70d1972b8b6c5b1b8c864c01f5e30203ad6dd4"
+checksum = "71c474afc7e589bf079555e3eb5d129f51d0444df790e2297d944f0cb855a564"
 dependencies = [
  "hf-hub",
  "minijinja",
@@ -1734,9 +1734,9 @@ dependencies = [
 
 [[package]]
 name = "minijinja"
-version = "2.8.0"
+version = "2.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6e36f1329330bb1614c94b78632b9ce45dd7d761f3304a1bed07b2990a7c5097"
+checksum = "dd72e8b4e42274540edabec853f607c015c73436159b06c39c7af85a20433155"
 dependencies = [
  "serde",
 ]
