@@ -21,6 +21,12 @@ pub struct SimpleLLMConfig {
     pub modle_name: String,
     pub cache_path: Option<String>,
     pub think: bool,
+    #[serde(default = "default_legacy")]
+    pub legacy: bool,
+}
+
+fn default_legacy() -> bool {
+    true
 }
 
 #[derive(Debug)]
@@ -93,18 +99,56 @@ impl actix::Handler<ShutdownMessages> for SimpleRkLLM {
 impl AIModel for SimpleRkLLM {
     type Config = SimpleLLMConfig;
     fn init(config: &SimpleLLMConfig) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
+        // Set environment variable for sentencepiece to find the correct library
+        std::env::set_var("LD_LIBRARY_PATH", "/usr/local/lib:".to_string() + &std::env::var("LD_LIBRARY_PATH").unwrap_or_default());
+        
         let mut param = RKLLMParam {
             ..Default::default()
         };
-        let api = Api::new().unwrap();
+        
+        // Model loading with better error handling
+        let api = Api::new().map_err(|e| format!("Failed to initialize HF API: {}", e))?;
         let repo = api.model(config.modle_path.clone());
-        let binding = repo.get("model.rkllm")?;
+        let binding = repo.get("model.rkllm").map_err(|e| format!("Failed to get model file: {}", e))?;
         let modle_path = binding.to_string_lossy();
         let c_str = CString::new(modle_path.as_ref()).unwrap();
         param.model_path = c_str.as_ptr();
 
-        let handle = rkllm_init(&mut param)?;
-        let atoken = AutoTokenizer::from_pretrained(config.modle_path.clone(), None)?;
+        // Try to initialize the model with custom error handling
+        let handle = match rkllm_init(&mut param) {
+            Ok(h) => h,
+            Err(e) => {
+                // If the error mentions "missing field `legacy`", try to work around it
+                if e.to_string().contains("missing field `legacy`") {
+                    println!("Warning: Detected 'missing field legacy' error, attempting to continue anyway");
+                    // Try to initialize with a different approach or return a fallback
+                    return Err("Model initialization failed due to a missing 'legacy' field in the model config. This may be due to a version mismatch between your model and the rkllm-rs library. Try using a different model or updating the rkllm-rs dependency.".into());
+                } else {
+                    return Err(e);
+                }
+            }
+        };
+        
+        // Initialize tokenizer with custom error handling
+        let atoken = match AutoTokenizer::from_pretrained(config.modle_path.clone(), None) {
+            Ok(tokenizer) => tokenizer,
+            Err(e) => {
+                if e.to_string().contains("missing field `legacy`") {
+                    println!("Warning: Detected missing field 'legacy' error in tokenizer initialization");
+                    eprintln!("This error is likely due to a mismatch between your model configuration ");
+                    eprintln!("and the autotokenizer library after adding tool calling support.");
+                    eprintln!("\nPossible solutions:\n");
+                    eprintln!("1. Try a different model that's compatible with your current server version");
+                    eprintln!("2. Update the rkllm-rs and autotokenizer crates to versions that support your model");
+                    eprintln!("3. Downgrade your server code to a version before adding tool calling support");
+                    return Err(Box::new(std::io::Error::new(std::io::ErrorKind::Other, 
+                        "Tokenizer initialization failed: model config is incompatible with current autotokenizer version")));
+                } else {
+                    return Err(Box::new(std::io::Error::new(std::io::ErrorKind::Other, 
+                        format!("Tokenizer initialization failed: {}", e))));
+                }
+            }
+        };
 
         let infer_params = RKLLMInferParam {
             mode: RKLLMInferMode::InferGenerate,
