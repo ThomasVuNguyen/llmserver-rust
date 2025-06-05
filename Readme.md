@@ -121,7 +121,39 @@ The API server provides the following endpoints:
 ### Usage example
 
 Server side:
-```Bash
+
+#### Using the Wrapper Script
+
+To avoid library version conflicts (particularly with SentencePiece), use the provided wrapper script:
+
+```bash
+# Make the script executable
+chmod +x run_llm_server.sh
+
+# Run the server with your model
+./run_llm_server.sh ThomasTheMaker/Qwen3-1.7B-RKLLM-v1.2.0
+```
+
+This script sets the correct `LD_LIBRARY_PATH` environment variable to ensure the system uses the appropriate version of `libsentencepiece.so`.
+
+#### Fixing Model Compatibility Issues
+
+If you encounter an error about a missing `legacy` field when using models with tool calling functionality, use the provided patch script:
+
+```bash
+# Make the script executable
+chmod +x patch_tokenizer_config.py
+
+# Patch the model's tokenizer configuration
+./patch_tokenizer_config.py
+```
+
+You may need to modify the script's `model_path` variable if using a different model.
+
+### Example Commands
+
+```bash
+# Traditional method using cargo directly
 yourname@hostname$ cargo run happyme531/SenseVoiceSmall-RKNN2
 [2025-03-20T07:55:18Z INFO  hf_hub] Using token file found "/home/kautism/.cache/huggingface/token"
 [2025-03-20T07:55:27Z INFO  actix_server::builder] starting 8 workers
